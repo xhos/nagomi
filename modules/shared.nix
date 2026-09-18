@@ -3,22 +3,25 @@
   lib,
   ...
 }: let
-  cfg = config.services.null;
+  cfg = config.services.nagomi;
   inherit (lib) types mkIf mkOption mkEnableOption;
 in {
-  options.services.null = {
-    enable = mkEnableOption "null finance tracker";
+  options.services.nagomi = {
+    enable = mkEnableOption "nagomi finance tracker";
+
+    # These defaults identify existing production data and Unix accounts.
+    # Change them only with an explicit migration of the data on mizore.
 
     user = mkOption {
       type = types.str;
       default = "null";
-      description = "user under which null services run";
+      description = "user under which nagomi services run";
     };
 
     group = mkOption {
       type = types.str;
       default = "null";
-      description = "group under which null services run";
+      description = "group under which nagomi services run";
     };
 
     dataDir = mkOption {
@@ -45,13 +48,13 @@ in {
           check = it: lib.isString it && lib.types.path.check it;
         });
       default = null;
-      example = "/run/secrets/null";
+      example = "/run/secrets/nagomi";
       description = "shared secrets file loaded by all services as an EnvironmentFile, not added to the nix store";
     };
 
     database = {
       enable =
-        mkEnableOption "postgresql for null"
+        mkEnableOption "postgresql for nagomi"
         // {
           default = true;
         };
@@ -99,11 +102,11 @@ in {
     assertions = [
       {
         assertion = lib.hasPrefix "/" cfg.database.host || cfg.secretsFile != null;
-        message = "services.null.secretsFile must be set with DATABASE_URL and AUTH_DATABASE_URL when not using unix sockets";
+        message = "services.nagomi.secretsFile must be set with DATABASE_URL and AUTH_DATABASE_URL when not using unix sockets";
       }
       {
         assertion = !cfg.emailParser.enable || cfg.core.enable;
-        message = "services.null.core must be enabled when emailParser is enabled";
+        message = "services.nagomi.core must be enabled when emailParser is enabled";
       }
     ];
 
@@ -132,8 +135,8 @@ in {
       ];
     };
 
-    systemd.services.null-db-setup = mkIf (cfg.database.enable && cfg.database.createDB) {
-      description = "null: database setup";
+    systemd.services.nagomi-db-setup = mkIf (cfg.database.enable && cfg.database.createDB) {
+      description = "nagomi: database setup";
       requires = ["postgresql.service" "postgresql-setup.service"];
       after = ["postgresql.service" "postgresql-setup.service"];
       wantedBy = ["multi-user.target"];
@@ -153,11 +156,11 @@ in {
       '';
     };
 
-    systemd.slices.system-null = {
-      description = "null finance tracker services";
+    systemd.slices.system-nagomi = {
+      description = "nagomi finance tracker services";
     };
 
-    systemd.tmpfiles.settings.null = {
+    systemd.tmpfiles.settings.nagomi = {
       "${cfg.dataDir}" = {
         d = {
           user = cfg.user;

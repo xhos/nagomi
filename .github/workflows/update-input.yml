@@ -6,7 +6,13 @@ on:
       input:
         description: flake input name to update
         required: true
-        type: string
+        type: choice
+        options:
+          - nagomi-core
+          - nagomi-gateway
+          - nagomi-web
+          - nagomi-receipts
+          - nagomi-email-parser
 
 jobs:
   update:

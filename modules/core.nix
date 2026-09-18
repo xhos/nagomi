@@ -3,7 +3,7 @@
   lib,
   ...
 }: let
-  cfg = config.services.null;
+  cfg = config.services.nagomi;
   svcCfg = cfg.core;
   isUnixSocket = lib.hasPrefix "/" cfg.database.host;
 
@@ -17,7 +17,7 @@
 
   inherit (lib) types mkIf mkOption optionals optionalAttrs;
 in {
-  options.services.null.core = {
+  options.services.nagomi.core = {
     enable = mkOption {
       type = types.bool;
       default = true;
@@ -26,7 +26,7 @@ in {
 
     package = mkOption {
       type = types.package;
-      description = "the null-core package to use";
+      description = "the nagomi-core package to use";
     };
 
     port = mkOption {
@@ -50,7 +50,7 @@ in {
     environment = mkOption {
       type = types.submodule {freeformType = types.attrsOf types.str;};
       default = {};
-      description = "extra environment variables for null-core";
+      description = "extra environment variables for nagomi-core";
     };
 
     secretsFile = mkOption {
@@ -61,14 +61,14 @@ in {
   };
 
   config = mkIf (cfg.enable && svcCfg.enable) {
-    services.null.core.environment =
+    services.nagomi.core.environment =
       {
         LISTEN_ADDRESS = "${svcCfg.hostname}:${toString svcCfg.port}";
         LOG_LEVEL = cfg.logLevel;
         LOG_FORMAT = cfg.logFormat;
         EXCHANGE_API_URL = svcCfg.exchangeApiUrl;
-        NULL_GATEWAY_URL = "http://${cfg.gateway.hostname}:${toString cfg.gateway.port}";
-        NULL_RECEIPTS_URL = "${cfg.receipts.hostname}:${toString cfg.receipts.port}";
+        NAGOMI_GATEWAY_URL = "http://${cfg.gateway.hostname}:${toString cfg.gateway.port}";
+        NAGOMI_RECEIPTS_URL = "${cfg.receipts.hostname}:${toString cfg.receipts.port}";
       }
       // optionalAttrs isUnixSocket {
         DATABASE_URL = mkDatabaseUrl cfg.database.name;
@@ -79,23 +79,23 @@ in {
         S3_REGION = cfg.storage.region;
       };
 
-    systemd.services.null-core = {
-      description = "null: core backend";
+    systemd.services.nagomi-core = {
+      description = "nagomi: core backend";
       wantedBy = ["multi-user.target"];
       after =
         ["network.target"]
-        ++ optionals cfg.database.enable ["null-db-setup.service"]
-        ++ optionals cfg.storage.enable ["null-storage-setup.service"];
+        ++ optionals cfg.database.enable ["nagomi-db-setup.service"]
+        ++ optionals cfg.storage.enable ["nagomi-storage-setup.service"];
       requires =
-        optionals cfg.database.enable ["null-db-setup.service"]
-        ++ optionals cfg.storage.enable ["null-storage-setup.service"];
+        optionals cfg.database.enable ["nagomi-db-setup.service"]
+        ++ optionals cfg.storage.enable ["nagomi-storage-setup.service"];
       inherit (svcCfg) environment;
       serviceConfig =
         (import ./hardening.nix)
         // {
-          ExecStart = "${svcCfg.package}/bin/null";
+          ExecStart = "${svcCfg.package}/bin/nagomi";
           EnvironmentFile = mkEnvFiles svcCfg.secretsFile;
-          Slice = "system-null.slice";
+          Slice = "system-nagomi.slice";
           StateDirectory = "null";
           WorkingDirectory = "/var/lib/null";
           User = cfg.user;

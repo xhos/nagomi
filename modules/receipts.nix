@@ -3,7 +3,7 @@
   lib,
   ...
 }: let
-  cfg = config.services.null;
+  cfg = config.services.nagomi;
   svcCfg = cfg.receipts;
 
   mkEnvFiles = svcSecretsFile:
@@ -11,7 +11,7 @@
 
   inherit (lib) types mkIf mkOption optionalAttrs;
 in {
-  options.services.null.receipts = {
+  options.services.nagomi.receipts = {
     enable = mkOption {
       type = types.bool;
       default = true;
@@ -20,7 +20,7 @@ in {
 
     package = mkOption {
       type = types.package;
-      description = "the null-receipts package to use";
+      description = "the nagomi-receipts package to use";
     };
 
     port = mkOption {
@@ -65,7 +65,7 @@ in {
     environment = mkOption {
       type = types.submodule {freeformType = types.attrsOf types.str;};
       default = {};
-      description = "extra environment variables for null-receipts";
+      description = "extra environment variables for nagomi-receipts";
     };
 
     secretsFile = mkOption {
@@ -79,11 +79,11 @@ in {
     assertions = [
       {
         assertion = !(svcCfg.provider == "gemini") || svcCfg.secretsFile != null;
-        message = "services.null.receipts.secretsFile is required when using the gemini provider (must contain GOOGLE_API_KEY)";
+        message = "services.nagomi.receipts.secretsFile is required when using the gemini provider (must contain GOOGLE_API_KEY)";
       }
     ];
 
-    services.null.receipts.environment =
+    services.nagomi.receipts.environment =
       {
         LISTEN_ADDRESS = "${svcCfg.hostname}:${toString svcCfg.port}";
         LOG_LEVEL = cfg.logLevel;
@@ -98,8 +98,8 @@ in {
         GEMINI_MODEL = svcCfg.gemini.model;
       };
 
-    systemd.services.null-receipts = {
-      description = "null: receipt OCR";
+    systemd.services.nagomi-receipts = {
+      description = "nagomi: receipt OCR";
       wantedBy = ["multi-user.target"];
       after = ["network.target"];
       inherit (svcCfg) environment;
@@ -108,7 +108,7 @@ in {
         // {
           ExecStart = "${svcCfg.package}/bin/server";
           EnvironmentFile = mkEnvFiles svcCfg.secretsFile;
-          Slice = "system-null.slice";
+          Slice = "system-nagomi.slice";
           User = cfg.user;
           Group = cfg.group;
           StateDirectory = "null-receipts";

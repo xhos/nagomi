@@ -3,7 +3,7 @@
   lib,
   ...
 }: let
-  cfg = config.services.null;
+  cfg = config.services.nagomi;
   svcCfg = cfg.gateway;
   isUnixSocket = lib.hasPrefix "/" cfg.database.host;
 
@@ -17,7 +17,7 @@
 
   inherit (lib) types mkIf mkOption optionals optionalAttrs concatStringsSep;
 in {
-  options.services.null.gateway = {
+  options.services.nagomi.gateway = {
     enable = mkOption {
       type = types.bool;
       default = true;
@@ -26,7 +26,7 @@ in {
 
     package = mkOption {
       type = types.package;
-      description = "the null-gateway package to use";
+      description = "the nagomi-gateway package to use";
     };
 
     port = mkOption {
@@ -64,13 +64,13 @@ in {
     environment = mkOption {
       type = types.submodule {freeformType = types.attrsOf types.str;};
       default = {};
-      description = "extra environment variables for null-gateway";
+      description = "extra environment variables for nagomi-gateway";
     };
 
     secretsFile = mkOption {
       type = types.nullOr types.str;
       default = null;
-      example = "/run/secrets/null-gateway";
+      example = "/run/secrets/nagomi-gateway";
       description = "gateway-specific secrets file, must contain BETTER_AUTH_SECRET";
     };
   };
@@ -79,14 +79,14 @@ in {
     assertions = [
       {
         assertion = svcCfg.secretsFile != null;
-        message = "services.null.gateway.secretsFile is required (must contain BETTER_AUTH_SECRET)";
+        message = "services.nagomi.gateway.secretsFile is required (must contain BETTER_AUTH_SECRET)";
       }
     ];
 
-    services.null.gateway.environment =
+    services.nagomi.gateway.environment =
       {
         BETTER_AUTH_URL = svcCfg.url;
-        NULL_CORE_URL = "http://${cfg.core.hostname}:${toString cfg.core.port}";
+        NAGOMI_CORE_URL = "http://${cfg.core.hostname}:${toString cfg.core.port}";
         TRUSTED_ORIGINS = concatStringsSep "," svcCfg.trustedOrigins;
         HOSTNAME = svcCfg.hostname;
         PORT = toString svcCfg.port;
@@ -100,22 +100,22 @@ in {
         COOKIE_DOMAIN = svcCfg.cookieDomain;
       };
 
-    systemd.services.null-gateway = {
-      description = "null: auth gateway";
+    systemd.services.nagomi-gateway = {
+      description = "nagomi: auth gateway";
       wantedBy = ["multi-user.target"];
       after =
-        ["network.target" "null-core.service"]
-        ++ optionals cfg.database.enable ["null-db-setup.service"];
+        ["network.target" "nagomi-core.service"]
+        ++ optionals cfg.database.enable ["nagomi-db-setup.service"];
       requires =
-        ["null-core.service"]
-        ++ optionals cfg.database.enable ["null-db-setup.service"];
+        ["nagomi-core.service"]
+        ++ optionals cfg.database.enable ["nagomi-db-setup.service"];
       inherit (svcCfg) environment;
       serviceConfig =
         (import ./hardening.nix)
         // {
-          ExecStart = "${svcCfg.package}/bin/null-gateway";
+          ExecStart = "${svcCfg.package}/bin/nagomi-gateway";
           EnvironmentFile = mkEnvFiles svcCfg.secretsFile;
-          Slice = "system-null.slice";
+          Slice = "system-nagomi.slice";
           User = cfg.user;
           Group = cfg.group;
           StateDirectory = "null-gateway";

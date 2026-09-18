@@ -3,7 +3,7 @@
   lib,
   ...
 }: let
-  cfg = config.services.null;
+  cfg = config.services.nagomi;
   svcCfg = cfg.web;
 
   mkEnvFiles = svcSecretsFile:
@@ -11,7 +11,7 @@
 
   inherit (lib) types mkIf mkOption;
 in {
-  options.services.null.web = {
+  options.services.nagomi.web = {
     enable = mkOption {
       type = types.bool;
       default = true;
@@ -20,7 +20,7 @@ in {
 
     package = mkOption {
       type = types.package;
-      description = "the null-web package to use";
+      description = "the nagomi-web package to use";
     };
 
     port = mkOption {
@@ -38,7 +38,7 @@ in {
     environment = mkOption {
       type = types.submodule {freeformType = types.attrsOf types.str;};
       default = {};
-      description = "extra environment variables for null-web";
+      description = "extra environment variables for nagomi-web";
     };
 
     secretsFile = mkOption {
@@ -49,25 +49,25 @@ in {
   };
 
   config = mkIf (cfg.enable && svcCfg.enable) {
-    services.null.web.environment = {
+    services.nagomi.web.environment = {
       NEXT_PUBLIC_GATEWAY_URL = cfg.gateway.url;
       HOSTNAME = svcCfg.hostname;
       PORT = toString svcCfg.port;
       NEXT_TELEMETRY_DISABLED = "1";
     };
 
-    systemd.services.null-web = {
-      description = "null: web frontend";
+    systemd.services.nagomi-web = {
+      description = "nagomi: web frontend";
       wantedBy = ["multi-user.target"];
-      after = ["network.target" "null-gateway.service"];
-      requires = ["null-gateway.service"];
+      after = ["network.target" "nagomi-gateway.service"];
+      requires = ["nagomi-gateway.service"];
       inherit (svcCfg) environment;
       serviceConfig =
         (import ./hardening.nix)
         // {
-          ExecStart = "${svcCfg.package}/bin/null-web";
+          ExecStart = "${svcCfg.package}/bin/nagomi-web";
           EnvironmentFile = mkEnvFiles svcCfg.secretsFile;
-          Slice = "system-null.slice";
+          Slice = "system-nagomi.slice";
           User = cfg.user;
           Group = cfg.group;
           StateDirectory = "null-web";

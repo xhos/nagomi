@@ -4,11 +4,11 @@
   pkgs,
   ...
 }: let
-  cfg = config.services.null;
+  cfg = config.services.nagomi;
   svcCfg = cfg.storage;
   garage = "${svcCfg.package}/bin/garage";
   stateDir = "/var/lib/null-garage";
-  garageCfg = pkgs.writeText "null-garage.toml" ''
+  garageCfg = pkgs.writeText "nagomi-garage.toml" ''
     metadata_dir = "${stateDir}/meta"
     data_dir = "${stateDir}/data"
     db_engine = "sqlite"
@@ -26,9 +26,9 @@
   '';
   inherit (lib) types mkIf mkOption mkEnableOption;
 in {
-  options.services.null.storage = {
+  options.services.nagomi.storage = {
     enable =
-      mkEnableOption "garage S3 storage for null"
+      mkEnableOption "garage S3 storage for nagomi"
       // {default = true;};
 
     package = mkOption {
@@ -64,7 +64,7 @@ in {
     bucket = mkOption {
       type = types.str;
       default = "null-core";
-      description = "bucket used by null-core";
+      description = "bucket used by nagomi-core";
     };
 
     keyName = mkOption {
@@ -76,10 +76,10 @@ in {
     secretsFile = mkOption {
       type = types.nullOr types.str;
       default = null;
-      example = "/run/secrets/env/null/storage";
+      example = "/run/secrets/env/nagomi/storage";
       description = ''
         env file providing S3_ACCESS_KEY, S3_SECRET_KEY, and GARAGE_RPC_SECRET.
-        Falls back to services.null.secretsFile if unset.
+        Falls back to services.nagomi.secretsFile if unset.
       '';
     };
   };
@@ -88,7 +88,7 @@ in {
     assertions = [
       {
         assertion = (svcCfg.secretsFile != null) || (cfg.secretsFile != null);
-        message = "services.null.storage requires secretsFile (or services.null.secretsFile) providing S3_ACCESS_KEY, S3_SECRET_KEY, GARAGE_RPC_SECRET";
+        message = "services.nagomi.storage requires secretsFile (or services.nagomi.secretsFile) providing S3_ACCESS_KEY, S3_SECRET_KEY, GARAGE_RPC_SECRET";
       }
     ];
 
@@ -99,7 +99,7 @@ in {
     };
     users.groups.null-garage = {};
 
-    systemd.tmpfiles.settings.null-storage = {
+    systemd.tmpfiles.settings.nagomi-storage = {
       "${stateDir}" = {
         d = {
           user = "null-garage";
@@ -123,8 +123,8 @@ in {
       };
     };
 
-    systemd.services.null-garage = {
-      description = "null: garage object store";
+    systemd.services.nagomi-garage = {
+      description = "nagomi: garage object store";
       wantedBy = ["multi-user.target"];
       after = ["network.target"];
       serviceConfig = {
@@ -133,24 +133,36 @@ in {
         Group = "null-garage";
         StateDirectory = "null-garage";
         WorkingDirectory = stateDir;
-        EnvironmentFile = [(if svcCfg.secretsFile != null then svcCfg.secretsFile else cfg.secretsFile)];
+        EnvironmentFile = [
+          (
+            if svcCfg.secretsFile != null
+            then svcCfg.secretsFile
+            else cfg.secretsFile
+          )
+        ];
         ExecStart = "${garage} -c ${garageCfg} server";
         Restart = "on-failure";
         RestartSec = 3;
       };
     };
 
-    systemd.services.null-storage-setup = {
-      description = "null: garage layout, key, and bucket setup";
+    systemd.services.nagomi-storage-setup = {
+      description = "nagomi: garage layout, key, and bucket setup";
       wantedBy = ["multi-user.target"];
-      after = ["null-garage.service"];
-      requires = ["null-garage.service"];
+      after = ["nagomi-garage.service"];
+      requires = ["nagomi-garage.service"];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
         User = "null-garage";
         Group = "null-garage";
-        EnvironmentFile = [(if svcCfg.secretsFile != null then svcCfg.secretsFile else cfg.secretsFile)];
+        EnvironmentFile = [
+          (
+            if svcCfg.secretsFile != null
+            then svcCfg.secretsFile
+            else cfg.secretsFile
+          )
+        ];
       };
       script = ''
         set -eu

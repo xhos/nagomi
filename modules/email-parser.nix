@@ -3,7 +3,7 @@
   lib,
   ...
 }: let
-  cfg = config.services.null;
+  cfg = config.services.nagomi;
   svcCfg = cfg.emailParser;
 
   mkEnvFiles = svcSecretsFile:
@@ -11,7 +11,7 @@
 
   inherit (lib) types mkIf mkOption optionalAttrs;
 in {
-  options.services.null.emailParser = {
+  options.services.nagomi.emailParser = {
     enable = mkOption {
       type = types.bool;
       default = false;
@@ -20,7 +20,7 @@ in {
 
     package = mkOption {
       type = types.package;
-      description = "the null-email-parser package to use";
+      description = "the nagomi-email-parser package to use";
     };
 
     smtpPort = mkOption {
@@ -70,7 +70,7 @@ in {
     environment = mkOption {
       type = types.submodule {freeformType = types.attrsOf types.str;};
       default = {};
-      description = "extra environment variables for null-email-parser";
+      description = "extra environment variables for nagomi-email-parser";
     };
 
     secretsFile = mkOption {
@@ -81,9 +81,9 @@ in {
   };
 
   config = mkIf (cfg.enable && svcCfg.enable) {
-    services.null.emailParser.environment =
+    services.nagomi.emailParser.environment =
       {
-        NULL_CORE_URL = "${cfg.core.hostname}:${toString cfg.core.port}";
+        NAGOMI_CORE_URL = "${cfg.core.hostname}:${toString cfg.core.port}";
         DOMAIN = svcCfg.domain;
         SMTP_PORT = "${svcCfg.hostname}:${toString svcCfg.smtpPort}";
         GRPC_PORT = "${svcCfg.hostname}:${toString svcCfg.grpcPort}";
@@ -98,11 +98,11 @@ in {
         TLS_KEY = toString svcCfg.tls.keyFile;
       };
 
-    systemd.services.null-email-parser = {
-      description = "null: email parser";
+    systemd.services.nagomi-email-parser = {
+      description = "nagomi: email parser";
       wantedBy = ["multi-user.target"];
-      after = ["network.target" "null-core.service"];
-      requires = ["null-core.service"];
+      after = ["network.target" "nagomi-core.service"];
+      requires = ["nagomi-core.service"];
       inherit (svcCfg) environment;
       unitConfig = {
         StartLimitIntervalSec = "5min";
@@ -113,7 +113,7 @@ in {
         // {
           ExecStart = "${svcCfg.package}/bin/server";
           EnvironmentFile = mkEnvFiles svcCfg.secretsFile;
-          Slice = "system-null.slice";
+          Slice = "system-nagomi.slice";
           User = cfg.user;
           Group = cfg.group;
           StateDirectory = "null-email-parser";
