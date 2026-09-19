@@ -13,10 +13,17 @@ in {
     // {
       enable = mkEnableOption "email parser SMTP ingest";
 
+      smtpAddress = mkOption {
+        type = types.str;
+        default = "127.0.0.1";
+        example = "0.0.0.0";
+        description = "SMTP listen address; mail is forwarded in from outside, so this is usually not loopback";
+      };
+
       smtpPort = mkOption {
         type = types.port;
         default = 2525;
-        description = "SMTP listen port, bound to 127.0.0.1";
+        description = "SMTP listen port";
       };
 
       domain = mkOption {
@@ -45,7 +52,7 @@ in {
 
   config = mkIf (cfg.enable && svc.enable) {
     services.nagomi.emailParser.environment = nagomi.mkEnv ({
-        SMTP_PORT = "127.0.0.1:${toString svc.smtpPort}";
+        SMTP_PORT = "${svc.smtpAddress}:${toString svc.smtpPort}";
         GRPC_PORT = "127.0.0.1:${toString svc.port}";
         LOG_LEVEL = cfg.logLevel;
         LOG_FORMAT = cfg.logFormat;
