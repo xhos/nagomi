@@ -4,122 +4,64 @@
   ...
 }: let
   cfg = config.services.nagomi;
-  svcCfg = cfg.emailParser;
-
-  mkEnvFiles = svcSecretsFile:
-    builtins.filter (f: f != null) [cfg.secretsFile svcSecretsFile];
-
-  inherit (lib) types mkIf mkOption optionalAttrs;
+  svc = cfg.emailParser;
+  nagomi = import ./lib.nix {inherit config lib;};
+  inherit (lib) types mkIf mkOption mkEnableOption optionalAttrs;
 in {
-  options.services.nagomi.emailParser = {
-    enable = mkOption {
-      type = types.bool;
-      default = false;
-      description = "enable email parser SMTP ingest service";
-    };
+  options.services.nagomi.emailParser =
+    nagomi.serviceOptions "email-parser" 55557
+    // {
+      enable = mkEnableOption "email parser SMTP ingest";
 
-    package = mkOption {
-      type = types.package;
-      description = "the nagomi-email-parser package to use";
-    };
+      smtpPort = mkOption {
+        type = types.port;
+        default = 2525;
+        description = "SMTP listen port, bound to 127.0.0.1";
+      };
 
-    smtpPort = mkOption {
-      type = types.port;
-      default = 2525;
-      description = "SMTP listen port";
-    };
+      domain = mkOption {
+        type = types.str;
+        example = "mail.finances.example.com";
+        description = "domain that receives bank notification emails";
+      };
 
-    grpcPort = mkOption {
-      type = types.port;
-      default = 55557;
-      description = "gRPC health check port";
-    };
-
-    hostname = mkOption {
-      type = types.str;
-      default = "127.0.0.1";
-      description = "bind address";
-    };
-
-    domain = mkOption {
-      type = types.str;
-      example = "mail.finances.example.com";
-      description = "email domain for receiving transaction emails";
-    };
-
-    tls = {
-      certFile = mkOption {
-        type = types.nullOr types.path;
+      tls = mkOption {
+        type = types.nullOr (types.submodule {
+          options = {
+            certFile = mkOption {
+              type = types.path;
+              description = "TLS certificate chain";
+            };
+            keyFile = mkOption {
+              type = types.path;
+              description = "TLS private key";
+            };
+          };
+        });
         default = null;
-        description = "path to TLS certificate (fullchain.pem)";
-      };
-
-      keyFile = mkOption {
-        type = types.nullOr types.path;
-        default = null;
-        description = "path to TLS private key (privkey.pem)";
-      };
-
-      disableRequired = mkOption {
-        type = types.bool;
-        default = false;
-        description = "allow connections without TLS, unsafe — only for development";
+        description = "STARTTLS certificate; without it the SMTP server runs in plaintext";
       };
     };
 
-    environment = mkOption {
-      type = types.submodule {freeformType = types.attrsOf types.str;};
-      default = {};
-      description = "extra environment variables for nagomi-email-parser";
-    };
-
-    secretsFile = mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      description = "email parser secrets file";
-    };
-  };
-
-  config = mkIf (cfg.enable && svcCfg.enable) {
-    services.nagomi.emailParser.environment =
-      {
-        NAGOMI_CORE_URL = "${cfg.core.hostname}:${toString cfg.core.port}";
-        DOMAIN = svcCfg.domain;
-        SMTP_PORT = "${svcCfg.hostname}:${toString svcCfg.smtpPort}";
-        GRPC_PORT = "${svcCfg.hostname}:${toString svcCfg.grpcPort}";
+  config = mkIf (cfg.enable && svc.enable) {
+    services.nagomi.emailParser.environment = nagomi.mkEnv ({
+        SMTP_PORT = "127.0.0.1:${toString svc.smtpPort}";
+        GRPC_PORT = "127.0.0.1:${toString svc.port}";
         LOG_LEVEL = cfg.logLevel;
         LOG_FORMAT = cfg.logFormat;
+        DOMAIN = svc.domain;
+        NAGOMI_CORE_URL = "127.0.0.1:${toString cfg.core.port}";
       }
-      // optionalAttrs svcCfg.tls.disableRequired {
-        UNSAFE_DISABLE_TLS_REQUIRED = "true";
-      }
-      // optionalAttrs (svcCfg.tls.certFile != null) {
-        TLS_CERT = toString svcCfg.tls.certFile;
-        TLS_KEY = toString svcCfg.tls.keyFile;
-      };
+      // optionalAttrs (svc.tls != null) {
+        TLS_CERT = toString svc.tls.certFile;
+        TLS_KEY = toString svc.tls.keyFile;
+      });
 
-    systemd.services.nagomi-email-parser = {
-      description = "nagomi: email parser";
-      wantedBy = ["multi-user.target"];
-      after = ["network.target" "nagomi-core.service"];
+    systemd.services.nagomi-email-parser = nagomi.mkService "email-parser" {
+      inherit (svc) environment secretsFile;
+      description = "email parser";
+      exe = lib.getExe' svc.package "server";
       requires = ["nagomi-core.service"];
-      inherit (svcCfg) environment;
-      unitConfig = {
-        StartLimitIntervalSec = "5min";
-        StartLimitBurst = 100;
-      };
-      serviceConfig =
-        (import ./hardening.nix)
-        // {
-          ExecStart = "${svcCfg.package}/bin/server";
-          EnvironmentFile = mkEnvFiles svcCfg.secretsFile;
-          Slice = "system-nagomi.slice";
-          User = cfg.user;
-          Group = cfg.group;
-          StateDirectory = "null-email-parser";
-          WorkingDirectory = "/var/lib/null-email-parser";
-          ReadWritePaths = ["/var/lib/null-email-parser"];
-        };
     };
   };
 }

@@ -4,117 +4,60 @@
   ...
 }: let
   cfg = config.services.nagomi;
-  svcCfg = cfg.receipts;
-
-  mkEnvFiles = svcSecretsFile:
-    builtins.filter (f: f != null) [cfg.secretsFile svcSecretsFile];
-
-  inherit (lib) types mkIf mkOption optionalAttrs;
+  svc = cfg.receipts;
+  nagomi = import ./lib.nix {inherit config lib;};
+  inherit (lib) types mkIf mkOption mkEnableOption optionalAttrs;
 in {
-  options.services.nagomi.receipts = {
-    enable = mkOption {
-      type = types.bool;
-      default = true;
-      description = "enable receipt OCR service";
-    };
+  options.services.nagomi.receipts =
+    nagomi.serviceOptions "receipts" 55556
+    // {
+      enable = mkEnableOption "receipt OCR" // {default = true;};
 
-    package = mkOption {
-      type = types.package;
-      description = "the nagomi-receipts package to use";
-    };
-
-    port = mkOption {
-      type = types.port;
-      default = 55556;
-      description = "listen port";
-    };
-
-    hostname = mkOption {
-      type = types.str;
-      default = "127.0.0.1";
-      description = "bind address";
-    };
-
-    provider = mkOption {
-      type = types.enum ["ollama" "gemini"];
-      default = "ollama";
-      description = "vision model provider for receipt OCR";
-    };
-
-    ollama = {
-      host = mkOption {
-        type = types.str;
-        default = "http://localhost:11434";
-        description = "ollama API endpoint";
+      provider = mkOption {
+        type = types.enum ["ollama" "gemini"];
+        default = "ollama";
+        description = "vision model provider; gemini needs GOOGLE_API_KEY in a secrets file";
       };
-      model = mkOption {
-        type = types.str;
-        default = "qwen2.5vl:3b";
-        description = "ollama model name";
-      };
-    };
 
-    gemini = {
-      model = mkOption {
+      ollama = {
+        host = mkOption {
+          type = types.str;
+          default = "http://127.0.0.1:11434";
+          description = "ollama API endpoint";
+        };
+        model = mkOption {
+          type = types.str;
+          default = "qwen2.5vl:3b";
+          description = "ollama model";
+        };
+      };
+
+      gemini.model = mkOption {
         type = types.str;
         default = "gemini-2.0-flash";
-        description = "gemini model name";
+        description = "gemini model";
       };
     };
 
-    environment = mkOption {
-      type = types.submodule {freeformType = types.attrsOf types.str;};
-      default = {};
-      description = "extra environment variables for nagomi-receipts";
-    };
-
-    secretsFile = mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      description = "receipts-specific secrets file (e.g. GOOGLE_API_KEY for gemini)";
-    };
-  };
-
-  config = mkIf (cfg.enable && svcCfg.enable) {
-    assertions = [
-      {
-        assertion = !(svcCfg.provider == "gemini") || svcCfg.secretsFile != null;
-        message = "services.nagomi.receipts.secretsFile is required when using the gemini provider (must contain GOOGLE_API_KEY)";
-      }
-    ];
-
-    services.nagomi.receipts.environment =
-      {
-        LISTEN_ADDRESS = "${svcCfg.hostname}:${toString svcCfg.port}";
+  config = mkIf (cfg.enable && svc.enable) {
+    services.nagomi.receipts.environment = nagomi.mkEnv ({
+        LISTEN_ADDRESS = "127.0.0.1:${toString svc.port}";
         LOG_LEVEL = cfg.logLevel;
         LOG_FORMAT = cfg.logFormat;
-        PROVIDER = svcCfg.provider;
+        PROVIDER = svc.provider;
       }
-      // optionalAttrs (svcCfg.provider == "ollama") {
-        OLLAMA_HOST = svcCfg.ollama.host;
-        OLLAMA_MODEL = svcCfg.ollama.model;
+      // optionalAttrs (svc.provider == "ollama") {
+        OLLAMA_HOST = svc.ollama.host;
+        OLLAMA_MODEL = svc.ollama.model;
       }
-      // optionalAttrs (svcCfg.provider == "gemini") {
-        GEMINI_MODEL = svcCfg.gemini.model;
-      };
+      // optionalAttrs (svc.provider == "gemini") {
+        GEMINI_MODEL = svc.gemini.model;
+      });
 
-    systemd.services.nagomi-receipts = {
-      description = "nagomi: receipt OCR";
-      wantedBy = ["multi-user.target"];
-      after = ["network.target"];
-      inherit (svcCfg) environment;
-      serviceConfig =
-        (import ./hardening.nix)
-        // {
-          ExecStart = "${svcCfg.package}/bin/server";
-          EnvironmentFile = mkEnvFiles svcCfg.secretsFile;
-          Slice = "system-nagomi.slice";
-          User = cfg.user;
-          Group = cfg.group;
-          StateDirectory = "null-receipts";
-          WorkingDirectory = "/var/lib/null-receipts";
-          ReadWritePaths = ["/var/lib/null-receipts"];
-        };
+    systemd.services.nagomi-receipts = nagomi.mkService "receipts" {
+      inherit (svc) environment secretsFile;
+      description = "receipt OCR";
+      exe = lib.getExe' svc.package "server";
     };
   };
 }

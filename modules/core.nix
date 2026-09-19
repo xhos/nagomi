@@ -4,104 +4,33 @@
   ...
 }: let
   cfg = config.services.nagomi;
-  svcCfg = cfg.core;
-  isUnixSocket = lib.hasPrefix "/" cfg.database.host;
-
-  mkDatabaseUrl = dbName:
-    if isUnixSocket
-    then "postgresql:///${dbName}?host=${cfg.database.host}"
-    else "postgresql://${cfg.database.user}@${cfg.database.host}:${toString cfg.database.port}/${dbName}";
-
-  mkEnvFiles = svcSecretsFile:
-    builtins.filter (f: f != null) [cfg.secretsFile svcSecretsFile];
-
-  inherit (lib) types mkIf mkOption optionals optionalAttrs;
+  svc = cfg.core;
+  nagomi = import ./lib.nix {inherit config lib;};
+  inherit (lib) mkIf optionalAttrs;
 in {
-  options.services.nagomi.core = {
-    enable = mkOption {
-      type = types.bool;
-      default = true;
-      description = "enable core backend service";
-    };
+  options.services.nagomi.core = nagomi.serviceOptions "core" 55555;
 
-    package = mkOption {
-      type = types.package;
-      description = "the nagomi-core package to use";
-    };
-
-    port = mkOption {
-      type = types.port;
-      default = 55555;
-      description = "listen port";
-    };
-
-    hostname = mkOption {
-      type = types.str;
-      default = "127.0.0.1";
-      description = "bind address";
-    };
-
-    exchangeApiUrl = mkOption {
-      type = types.str;
-      default = "https://api.frankfurter.dev/v1";
-      description = "currency exchange rate API URL";
-    };
-
-    environment = mkOption {
-      type = types.submodule {freeformType = types.attrsOf types.str;};
-      default = {};
-      description = "extra environment variables for nagomi-core";
-    };
-
-    secretsFile = mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      description = "core-specific secrets file";
-    };
-  };
-
-  config = mkIf (cfg.enable && svcCfg.enable) {
-    services.nagomi.core.environment =
-      {
-        LISTEN_ADDRESS = "${svcCfg.hostname}:${toString svcCfg.port}";
+  config = mkIf cfg.enable {
+    services.nagomi.core.environment = nagomi.mkEnv ({
+        LISTEN_ADDRESS = "127.0.0.1:${toString svc.port}";
         LOG_LEVEL = cfg.logLevel;
         LOG_FORMAT = cfg.logFormat;
-        EXCHANGE_API_URL = svcCfg.exchangeApiUrl;
-        NAGOMI_GATEWAY_URL = "http://${cfg.gateway.hostname}:${toString cfg.gateway.port}";
-        NAGOMI_RECEIPTS_URL = "${cfg.receipts.hostname}:${toString cfg.receipts.port}";
-      }
-      // optionalAttrs isUnixSocket {
-        DATABASE_URL = mkDatabaseUrl cfg.database.name;
-      }
-      // optionalAttrs cfg.storage.enable {
+        DATABASE_URL = "postgresql:///nagomi?host=/run/postgresql";
+        EXCHANGE_API_URL = "https://api.frankfurter.dev/v1";
+        NAGOMI_GATEWAY_URL = "http://127.0.0.1:${toString cfg.gateway.port}";
         S3_ENDPOINT = "http://127.0.0.1:${toString cfg.storage.s3Port}";
         S3_BUCKET = cfg.storage.bucket;
         S3_REGION = cfg.storage.region;
-      };
+      }
+      // optionalAttrs cfg.receipts.enable {
+        NAGOMI_RECEIPTS_URL = "http://127.0.0.1:${toString cfg.receipts.port}";
+      });
 
-    systemd.services.nagomi-core = {
-      description = "nagomi: core backend";
-      wantedBy = ["multi-user.target"];
-      after =
-        ["network.target"]
-        ++ optionals cfg.database.enable ["nagomi-db-setup.service"]
-        ++ optionals cfg.storage.enable ["nagomi-storage-setup.service"];
-      requires =
-        optionals cfg.database.enable ["nagomi-db-setup.service"]
-        ++ optionals cfg.storage.enable ["nagomi-storage-setup.service"];
-      inherit (svcCfg) environment;
-      serviceConfig =
-        (import ./hardening.nix)
-        // {
-          ExecStart = "${svcCfg.package}/bin/nagomi";
-          EnvironmentFile = mkEnvFiles svcCfg.secretsFile;
-          Slice = "system-nagomi.slice";
-          StateDirectory = "null";
-          WorkingDirectory = "/var/lib/null";
-          User = cfg.user;
-          Group = cfg.group;
-          ReadWritePaths = [cfg.dataDir];
-        };
+    systemd.services.nagomi-core = nagomi.mkService "core" {
+      inherit (svc) environment secretsFile;
+      description = "core backend";
+      exe = lib.getExe' svc.package "nagomi";
+      requires = ["nagomi-db-setup.service" "nagomi-storage-setup.service"];
     };
   };
 }

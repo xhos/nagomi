@@ -5,36 +5,34 @@
   ...
 }: let
   cfg = config.services.nagomi;
-  svcCfg = cfg.storage;
-  garage = "${svcCfg.package}/bin/garage";
-  stateDir = "/var/lib/null-garage";
-  garageCfg = pkgs.writeText "nagomi-garage.toml" ''
+  svc = cfg.storage;
+  nagomi = import ./lib.nix {inherit config lib;};
+  inherit (lib) types mkIf mkOption;
+
+  stateDir = "/var/lib/nagomi/garage";
+  garage = "${lib.getExe svc.package} -c ${garageConfig}";
+  garageConfig = pkgs.writeText "nagomi-garage.toml" ''
     metadata_dir = "${stateDir}/meta"
     data_dir = "${stateDir}/data"
     db_engine = "sqlite"
     replication_factor = 1
-    rpc_bind_addr = "127.0.0.1:${toString svcCfg.rpcPort}"
-    rpc_public_addr = "127.0.0.1:${toString svcCfg.rpcPort}"
+    rpc_bind_addr = "127.0.0.1:${toString svc.rpcPort}"
+    rpc_public_addr = "127.0.0.1:${toString svc.rpcPort}"
 
     [s3_api]
-    api_bind_addr = "127.0.0.1:${toString svcCfg.s3Port}"
-    s3_region = "${svcCfg.region}"
+    api_bind_addr = "127.0.0.1:${toString svc.s3Port}"
+    s3_region = "${svc.region}"
     root_domain = ".s3.local"
 
     [admin]
-    api_bind_addr = "127.0.0.1:${toString svcCfg.adminPort}"
+    api_bind_addr = "127.0.0.1:${toString svc.adminPort}"
   '';
-  inherit (lib) types mkIf mkOption mkEnableOption;
 in {
   options.services.nagomi.storage = {
-    enable =
-      mkEnableOption "garage S3 storage for nagomi"
-      // {default = true;};
-
     package = mkOption {
       type = types.package;
       default = pkgs.garage;
-      description = "garage package to use";
+      description = "garage package";
     };
 
     s3Port = mkOption {
@@ -46,13 +44,13 @@ in {
     rpcPort = mkOption {
       type = types.port;
       default = 55581;
-      description = "internal RPC port";
+      description = "cluster RPC port";
     };
 
     adminPort = mkOption {
       type = types.port;
       default = 55582;
-      description = "admin API port (used for readiness check)";
+      description = "admin API port";
     };
 
     region = mkOption {
@@ -63,127 +61,46 @@ in {
 
     bucket = mkOption {
       type = types.str;
-      default = "null-core";
-      description = "bucket used by nagomi-core";
-    };
-
-    keyName = mkOption {
-      type = types.str;
-      default = "null-core";
-      description = "garage key name (matched on bucket allow)";
-    };
-
-    secretsFile = mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      example = "/run/secrets/env/nagomi/storage";
-      description = ''
-        env file providing S3_ACCESS_KEY, S3_SECRET_KEY, and GARAGE_RPC_SECRET.
-        Falls back to services.nagomi.secretsFile if unset.
-      '';
+      default = "nagomi";
+      description = "bucket holding receipt blobs";
     };
   };
 
-  config = mkIf (cfg.enable && svcCfg.enable) {
-    assertions = [
-      {
-        assertion = (svcCfg.secretsFile != null) || (cfg.secretsFile != null);
-        message = "services.nagomi.storage requires secretsFile (or services.nagomi.secretsFile) providing S3_ACCESS_KEY, S3_SECRET_KEY, GARAGE_RPC_SECRET";
-      }
-    ];
-
-    users.users.null-garage = {
-      isSystemUser = true;
-      group = "null-garage";
-      home = stateDir;
-    };
-    users.groups.null-garage = {};
-
-    systemd.tmpfiles.settings.nagomi-storage = {
-      "${stateDir}" = {
-        d = {
-          user = "null-garage";
-          group = "null-garage";
-          mode = "0700";
-        };
-      };
-      "${stateDir}/meta" = {
-        d = {
-          user = "null-garage";
-          group = "null-garage";
-          mode = "0700";
-        };
-      };
-      "${stateDir}/data" = {
-        d = {
-          user = "null-garage";
-          group = "null-garage";
-          mode = "0700";
-        };
-      };
+  config = mkIf cfg.enable {
+    systemd.services.nagomi-garage = nagomi.mkService "garage" {
+      description = "object store";
+      exe = "${garage} server";
     };
 
-    systemd.services.nagomi-garage = {
-      description = "nagomi: garage object store";
-      wantedBy = ["multi-user.target"];
-      after = ["network.target"];
-      serviceConfig = {
-        Type = "simple";
-        User = "null-garage";
-        Group = "null-garage";
-        StateDirectory = "null-garage";
-        WorkingDirectory = stateDir;
-        EnvironmentFile = [
-          (
-            if svcCfg.secretsFile != null
-            then svcCfg.secretsFile
-            else cfg.secretsFile
-          )
-        ];
-        ExecStart = "${garage} -c ${garageCfg} server";
-        Restart = "on-failure";
-        RestartSec = 3;
-      };
-    };
-
+    # layout, key and bucket creation; every step is idempotent
     systemd.services.nagomi-storage-setup = {
-      description = "nagomi: garage layout, key, and bucket setup";
+      description = "nagomi object store setup";
       wantedBy = ["multi-user.target"];
-      after = ["nagomi-garage.service"];
       requires = ["nagomi-garage.service"];
+      after = ["nagomi-garage.service"];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        User = "null-garage";
-        Group = "null-garage";
-        EnvironmentFile = [
-          (
-            if svcCfg.secretsFile != null
-            then svcCfg.secretsFile
-            else cfg.secretsFile
-          )
-        ];
+        User = "nagomi";
+        Group = "nagomi";
+        EnvironmentFile = [cfg.secretsFile];
       };
       script = ''
-        set -eu
-        G="${garage} -c ${garageCfg}"
-
-        # wait for daemon
-        for _ in $(seq 1 60); do
-          $G status >/dev/null 2>&1 && break
+        for _ in $(seq 60); do
+          ${garage} status >/dev/null 2>&1 && break
           sleep 1
         done
 
-        NODE_ID=$($G node id -q | cut -d@ -f1)
-        if ! $G layout show 2>&1 | grep -q "$NODE_ID"; then
-          $G layout assign -z dc1 -c 1G "$NODE_ID"
-          VER=$($G layout show 2>&1 | sed -n 's/.*layout version: //p' | head -1)
-          $G layout apply --version $((VER + 1))
+        node=$(${garage} node id -q | cut -d@ -f1)
+        if ! ${garage} layout show 2>&1 | grep -q "$node"; then
+          ${garage} layout assign -z dc1 -c 1G "$node"
+          version=$(${garage} layout show 2>&1 | sed -n 's/.*layout version: //p' | head -1)
+          ${garage} layout apply --version $((version + 1))
         fi
 
-        $G key import --yes -n ${svcCfg.keyName} "$S3_ACCESS_KEY" "$S3_SECRET_KEY" 2>&1 | grep -v "already exists" || true
-        $G bucket create ${svcCfg.bucket} 2>&1 | grep -v "already exists" || true
-        $G bucket allow --read --write --owner --key ${svcCfg.keyName} ${svcCfg.bucket}
+        ${garage} key import --yes -n nagomi "$S3_ACCESS_KEY" "$S3_SECRET_KEY" 2>&1 | grep -v "already exists" || true
+        ${garage} bucket create ${svc.bucket} 2>&1 | grep -v "already exists" || true
+        ${garage} bucket allow --read --write --owner --key nagomi ${svc.bucket}
       '';
     };
   };

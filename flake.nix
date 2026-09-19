@@ -18,23 +18,24 @@
     nagomi-email-parser.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = {nixpkgs, ...} @ inputs: {
-    nixosModules.default = {pkgs, ...}: {
-      imports = [
-        ./modules/shared.nix
-        ./modules/core.nix
-        ./modules/gateway.nix
-        ./modules/web.nix
-        ./modules/receipts.nix
-        ./modules/email-parser.nix
-        ./modules/storage.nix
-      ];
+  outputs = inputs: {
+    nixosModules.default = {
+      lib,
+      pkgs,
+      ...
+    }: {
+      imports = [./modules];
 
-      services.nagomi.core.package = inputs.nagomi-core.packages.${pkgs.system}.default;
-      services.nagomi.gateway.package = inputs.nagomi-gateway.packages.${pkgs.system}.default;
-      services.nagomi.web.package = inputs.nagomi-web.packages.${pkgs.system}.default;
-      services.nagomi.receipts.package = inputs.nagomi-receipts.packages.${pkgs.system}.default;
-      services.nagomi.emailParser.package = inputs.nagomi-email-parser.packages.${pkgs.system}.default;
+      services.nagomi =
+        lib.mapAttrs (_: input: {
+          package = lib.mkDefault input.packages.${pkgs.stdenv.hostPlatform.system}.default;
+        }) {
+          core = inputs.nagomi-core;
+          gateway = inputs.nagomi-gateway;
+          web = inputs.nagomi-web;
+          receipts = inputs.nagomi-receipts;
+          emailParser = inputs.nagomi-email-parser;
+        };
     };
   };
 }
