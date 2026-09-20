@@ -84,6 +84,7 @@ in {
         User = "nagomi";
         Group = "nagomi";
         EnvironmentFile = [cfg.secretsFile];
+        Slice = "system-nagomi.slice";
       };
       script = ''
         for _ in $(seq 60); do

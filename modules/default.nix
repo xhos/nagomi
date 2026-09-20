@@ -14,6 +14,7 @@ in {
     ./web.nix
     ./receipts.nix
     ./email-parser.nix
+    ./monitoring
   ];
 
   options.services.nagomi = {

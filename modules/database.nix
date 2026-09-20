@@ -24,6 +24,7 @@ in {
         RemainAfterExit = true;
         User = "postgres";
         Group = "postgres";
+        Slice = "system-nagomi.slice";
       };
       script = let
         psql = lib.getExe' config.services.postgresql.package "psql";
