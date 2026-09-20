@@ -399,11 +399,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789437788,
-        "narHash": "sha256-y1p4NbKTyDNgsgxmK7QxZQWf6OsNm1NncEGfzfG17oI=",
+        "lastModified": 1789862649,
+        "narHash": "sha256-TKbrUrn6Fm1zP9ixMgU3aCpDi1PtHaIDXVuGjPFhdd8=",
         "owner": "xhos",
         "repo": "nagomi-web",
-        "rev": "e662fdf66fdbd90b6ee265048d32b328f9c4bc78",
+        "rev": "60a46d8bd72aac7adf60c700c92ccbcac2ff523c",
         "type": "github"
       },
       "original": {
