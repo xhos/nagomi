@@ -13,7 +13,7 @@ in {
     services.nagomi.web.environment = nagomi.mkEnv {
       HOSTNAME = "127.0.0.1";
       PORT = toString svc.port;
-      NEXT_PUBLIC_GATEWAY_URL = cfg.gateway.url;
+      GATEWAY_URL = cfg.gateway.url;
       NEXT_TELEMETRY_DISABLED = "1";
     };
 
