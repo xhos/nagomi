@@ -12,6 +12,7 @@ on:
           - nagomi-gateway
           - nagomi-web
           - nagomi-receipts
+          - nagomi-statements
           - nagomi-email-parser
 
 jobs:

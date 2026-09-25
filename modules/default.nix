@@ -13,6 +13,7 @@ in {
     ./gateway.nix
     ./web.nix
     ./receipts.nix
+    ./statements.nix
     ./email-parser.nix
     ./connector.nix
     ./monitoring

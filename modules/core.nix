@@ -24,6 +24,9 @@ in {
       }
       // optionalAttrs cfg.receipts.enable {
         NAGOMI_RECEIPTS_URL = "http://127.0.0.1:${toString cfg.receipts.port}";
+      }
+      // optionalAttrs cfg.statements.enable {
+        NAGOMI_STATEMENTS_URL = "http://127.0.0.1:${toString cfg.statements.port}";
       });
 
     systemd.services.nagomi-core = nagomi.mkService "core" {

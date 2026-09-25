@@ -14,6 +14,9 @@
     nagomi-receipts.url = "github:xhos/nagomi-receipts";
     nagomi-receipts.inputs.nixpkgs.follows = "nixpkgs";
 
+    nagomi-statements.url = "github:xhos/nagomi-statements";
+    nagomi-statements.inputs.nixpkgs.follows = "nixpkgs";
+
     nagomi-email-parser.url = "github:xhos/nagomi-email-parser";
     nagomi-email-parser.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -48,6 +51,7 @@
           gateway = inputs.nagomi-gateway;
           web = inputs.nagomi-web;
           receipts = inputs.nagomi-receipts;
+          statements = inputs.nagomi-statements;
           emailParser = inputs.nagomi-email-parser;
           connector = inputs.nagomi-connector;
         };
