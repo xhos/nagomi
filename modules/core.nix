@@ -16,7 +16,7 @@ in {
         LOG_LEVEL = cfg.logLevel;
         LOG_FORMAT = cfg.logFormat;
         DATABASE_URL = "postgresql:///nagomi?host=/run/postgresql";
-        EXCHANGE_API_URL = "https://api.frankfurter.dev/v1";
+        EXCHANGE_API_URL = "https://api.frankfurter.dev/v2";
         NAGOMI_GATEWAY_URL = "http://127.0.0.1:${toString cfg.gateway.port}";
         S3_ENDPOINT = "http://127.0.0.1:${toString cfg.storage.s3Port}";
         S3_BUCKET = cfg.storage.bucket;
