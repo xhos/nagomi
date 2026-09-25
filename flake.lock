@@ -416,11 +416,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790352810,
+        "lastModified": 1790352841,
         "narHash": "sha256-qbC6L5dZIPzrxUbvg01ZLkNiPFRFPs/MG6LnX5qRR04=",
         "owner": "xhos",
         "repo": "nagomi-email-parser",
-        "rev": "f447f8996e8221563abdfc92947d1af98133b6a0",
+        "rev": "3d9afd8f33c0b82bb8c76db150d83a47056deb56",
         "type": "github"
       },
       "original": {
