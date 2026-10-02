@@ -27,22 +27,30 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - name: update ${{ inputs.input }}
-        run: nix flake update ${{ inputs.input }}
-
-      - name: commit and push
+      # several services pushing at once dispatch parallel runs that race on main,
+      # so a rejected push redoes the update on top of the new main and tries again
+      - name: update ${{ inputs.input }}, commit and push
         id: push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add flake.lock
-          if git diff --cached --quiet; then
-            echo "pushed=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          git commit -m "flake: update ${{ inputs.input }}"
-          git push
-          echo "pushed=true" >> $GITHUB_OUTPUT
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            nix flake update ${{ inputs.input }}
+            git add flake.lock
+            if git diff --cached --quiet; then
+              echo "pushed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git commit -m "flake: update ${{ inputs.input }}"
+            if git push origin HEAD:main; then
+              echo "pushed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep $((attempt * 5))
+          done
+          exit 1
 
       - uses: peter-evans/repository-dispatch@v3
         if: steps.push.outputs.pushed == 'true'
