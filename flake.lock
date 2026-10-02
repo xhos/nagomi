@@ -495,11 +495,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790352841,
-        "narHash": "sha256-qbC6L5dZIPzrxUbvg01ZLkNiPFRFPs/MG6LnX5qRR04=",
+        "lastModified": 1790980340,
+        "narHash": "sha256-fUT84o3Vl2ZDHsHOZyS+Twx92Dt8Kt/a0J1YAP8oPJo=",
         "owner": "xhos",
         "repo": "nagomi-email-parser",
-        "rev": "3d9afd8f33c0b82bb8c76db150d83a47056deb56",
+        "rev": "75aacac80b6c25243cbed85ae6abf57c3893bf01",
         "type": "github"
       },
       "original": {
