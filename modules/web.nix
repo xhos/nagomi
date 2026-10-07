@@ -10,12 +10,15 @@ in {
   options.services.nagomi.web = nagomi.serviceOptions "web" 55554;
 
   config = lib.mkIf cfg.enable {
-    services.nagomi.web.environment = nagomi.mkEnv {
-      HOSTNAME = "127.0.0.1";
-      PORT = toString svc.port;
-      GATEWAY_URL = cfg.gateway.url;
-      NEXT_TELEMETRY_DISABLED = "1";
-    };
+    services.nagomi.web.environment = nagomi.mkEnv ({
+        HOSTNAME = "127.0.0.1";
+        PORT = toString svc.port;
+        GATEWAY_URL = cfg.gateway.url;
+        NEXT_TELEMETRY_DISABLED = "1";
+      }
+      // lib.optionalAttrs cfg.emailParser.enable {
+        MAIL_DOMAIN = cfg.emailParser.domain;
+      });
 
     systemd.services.nagomi-web = nagomi.mkService "web" {
       inherit (svc) environment secretsFile;
