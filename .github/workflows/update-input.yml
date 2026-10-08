@@ -14,6 +14,7 @@ on:
           - nagomi-receipts
           - nagomi-statements
           - nagomi-email-parser
+          - nagomi-connector
 
 jobs:
   update:
