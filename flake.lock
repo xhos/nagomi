@@ -560,11 +560,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790980360,
-        "narHash": "sha256-3UVXTgt80rD6v0D93SGsMYgjr07xSJD7oVoGEL5H+Fg=",
+        "lastModified": 1791474071,
+        "narHash": "sha256-3Y7dFJI+OJ+L934NjLeyts+swu3iUENlxBfBKuNDugQ=",
         "owner": "xhos",
         "repo": "nagomi-statements",
-        "rev": "bef3c0148316e85b1cf09090158707c455e8ea5e",
+        "rev": "a77e882908e74db10e088c339b3dbbae35829c46",
         "type": "github"
       },
       "original": {
