@@ -1,8 +1,23 @@
 # nagomi
 
-NixOS module for the nagomi finance tracker. Runs core, gateway, web, receipts,
-email-parser, postgres and a garage object store on one host, all as the
-`nagomi` user under `/var/lib/nagomi/<service>`.
+A self-hosted personal finance tracker. This repo is the NixOS module that runs the whole stack on one host, as the `nagomi` user under `/var/lib/nagomi/<service>`, alongside postgres and garage.
+
+## services
+
+| repo | | port |
+|---|---|---|
+| [nagomi-core](https://github.com/xhos/nagomi-core) | Backend | 55555 |
+| [nagomi-gateway](https://github.com/xhos/nagomi-gateway) | Auth, and the proxy clients use to reach core | 55550 |
+| [nagomi-web](https://github.com/xhos/nagomi-web) | Web dashboard | 55554 |
+| [nagomi-mobile](https://github.com/xhos/nagomi-mobile) | Android app | |
+| [nagomi-receipts](https://github.com/xhos/nagomi-receipts) | Receipt parsing | 55556 |
+| [nagomi-statements](https://github.com/xhos/nagomi-statements) | Statement parsing | 55559 |
+| [nagomi-email-parser](https://github.com/xhos/nagomi-email-parser) | Bank email ingest | 55557 |
+| [nagomi-connector](https://github.com/xhos/nagomi-connector) | Wise and SnapTrade sync | 55558 |
+| [nagomi-mcp](https://github.com/xhos/nagomi-mcp) | MCP server. Not part of this module | 55553 |
+| [nagomi-protos](https://github.com/xhos/nagomi-protos) | Shared protobuf definitions | |
+
+## usage
 
 ```nix
 {
@@ -27,10 +42,12 @@ email-parser, postgres and a garage object store on one host, all as the
 }
 ```
 
-Every service binds to `127.0.0.1` on its `port` option; put a reverse proxy in
-front of `web.port` and `gateway.port`. Anything the module puts in a service's
-environment can be overridden through its `environment` option. Databases and
-the bucket are created on boot; core and gateway run their own migrations.
+Receipts, statements and connector are on by default; email-parser and
+monitoring are opt-in. Every service binds to `127.0.0.1` on its `port` option;
+put a reverse proxy in front of `web.port` and `gateway.port`. Anything the
+module puts in a service's environment can be overridden through its
+`environment` option. Databases and the bucket are created on boot; core and
+gateway run their own migrations.
 
 ## monitoring
 
@@ -40,6 +57,8 @@ and ships it to loki; grafana (on `monitoring.port`, proxy it like the others)
 comes with the loki datasource and a `nagomi · logs` dashboard provisioned as
 the home page. Retention is `monitoring.loki.retention` (30d). State lives in
 `/var/lib/loki` and `/var/lib/grafana`; the journal itself must be persistent.
+
+## ci
 
 The `update flake input` workflow is dispatched by each `nagomi-*` repo's CI
 after a green build, bumps the lockfile, and triggers the deploy in `xhos/nix`.
