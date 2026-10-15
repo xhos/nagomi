@@ -34,6 +34,9 @@ in {
       description = "core backend";
       exe = lib.getExe' svc.package "nagomi";
       requires = ["nagomi-db-setup.service" "nagomi-storage-setup.service"];
+      # ready only once migrations ran and it is listening, so dependents
+      # ordered after it don't race its startup
+      type = "notify";
     };
   };
 }

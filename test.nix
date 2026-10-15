@@ -17,6 +17,10 @@ pkgs.testers.runNixOSTest {
     ]:
         machine.wait_for_unit(f"{unit}.service")
 
+    # core clients exit if core isn't serving yet; a restart means they raced it
+    for unit in ["nagomi-gateway", "nagomi-email-parser", "nagomi-connector"]:
+        machine.succeed(f"test $(systemctl show -P NRestarts {unit}.service) = 0")
+
     machine.wait_until_succeeds("curl -sf http://api.nagomi.localhost:8080/api/auth/ok")
     machine.wait_until_succeeds("curl -sf -o /dev/null http://nagomi.localhost:8080/")
 

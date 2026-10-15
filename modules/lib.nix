@@ -67,6 +67,7 @@ in rec {
     description,
     exe,
     requires ? [],
+    type ? "simple",
     environment ? {},
     secretsFile ? null,
   }: {
@@ -77,6 +78,7 @@ in rec {
     serviceConfig =
       hardening
       // {
+        Type = type;
         ExecStart = exe;
         EnvironmentFile = [cfg.secretsFile] ++ optional (secretsFile != null) secretsFile;
         User = "nagomi";
