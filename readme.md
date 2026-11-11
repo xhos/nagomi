@@ -31,8 +31,9 @@ A self-hosted personal finance tracker. This repo is the NixOS module that runs 
     gateway.url = "https://api.finances.example.com";
     gateway.trustedOrigins = ["https://finances.example.com"];
     gateway.cookieDomain = ".example.com";
-    receipts.provider = "gemini";
-    receipts.secretsFile = "/run/secrets/nagomi-receipts"; # GOOGLE_API_KEY
+    receipts.baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai";
+    receipts.model = "gemini-2.5-flash";
+    receipts.secretsFile = "/run/secrets/nagomi-receipts"; # OPENAI_API_KEY
     emailParser.enable = true;
     emailParser.domain = "mail.finances.example.com";
     monitoring.enable = true;
